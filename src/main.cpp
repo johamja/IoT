@@ -6,18 +6,18 @@
 
 ClosedCube_HDC1080 hdc1080;
 /*
-   This sample code demonstrates the normal use of a TinyGPSPlus (TinyGPSPlus) object.
-   It requires the use of SoftwareSerial, and assumes that you have a
-   4800-baud serial GPS device hooked up on pins 4(rx) and 3(tx).
+Este código de ejemplo muestra el uso normal de un objeto TinyGPSPlus (TinyGPSPlus). 
+Requiere el uso de SoftwareSerial y asume que tiene un dispositivo GPS serie de 4800 
+baudios conectado a los pines 4 (rx) y 3 (tx).
 */
-static const int RXPin = 4, TXPin = 3;
+static const int RXPin = 2, TXPin = 0;
 static const uint32_t GPSBaud = 9600;
 
 // The TinyGPSPlus object
 TinyGPSPlus gps;
 
 // The serial connection to the GPS device
-SoftwareSerial ss(RXPin, TXPin);
+SoftwareSerial gpsInput(RXPin, TXPin);
 
 void smartDelay(unsigned long ms);
 
@@ -26,17 +26,11 @@ void printSerialNumber();
 void setup() {
 
   Serial.begin(115200);
-  ss.begin(GPSBaud);
+  gpsInput.begin(GPSBaud);
 
   Serial.println(F("FullExample.ino"));
   Serial.println(F("An extensive example of many interesting TinyGPSPlus features"));
   Serial.print(F("Testing TinyGPSPlus library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-  Serial.println(F("by Mikal Hart"));
-  Serial.println();
-  Serial.println(F("Sats HDOP  Latitude   Longitude   Fix  Date       Time     Date Alt    Course Speed Card  Distance Course Card  Chars Sentences Checksum"));
-  Serial.println(F("           (deg)      (deg)       Age                      Age  (m)    --- from GPS ----  ---- to London  ----  RX    RX        Fail"));
-  Serial.println(F("----------------------------------------------------------------------------------------------------------------------------------------"));
-
 	Serial.println("ClosedCube HDC1080 Arduino Test");
 
 	// Default settings: 
@@ -84,8 +78,8 @@ void smartDelay(unsigned long ms)
   unsigned long start = millis();
   do 
   {
-    while (ss.available())
-      gps.encode(ss.read());
+    while (gpsInput.available())
+      gps.encode(gpsInput.read());
   } while (millis() - start < ms);
 }
 
