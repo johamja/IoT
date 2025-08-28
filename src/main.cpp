@@ -4,7 +4,6 @@
 #include <SoftwareSerial.h>
 #include "ClosedCube_HDC1080.h"
 #include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
 #include <map>
 #include <mbedtls/sha256.h> // Para el hash SHA-256
 #include <base64.h>			// Para codificar el cifrado (simulación)
@@ -14,10 +13,9 @@
 #include <Hash.h>
 
 // Constantes para usar WiFi
-const char *ssid = "UPBWiFi";
-const char *password = "";
-const char *route_server = "localhost:8080/iot";
-WiFiClient client;
+const char *ssid = "joham";
+const char *password = "joham1015";
+const char *url = "10.15.69.51";
 
 // Constates para usar el GPS
 static constexpr int RXPin = 2, TXPin = 0;
@@ -74,6 +72,10 @@ String generateSHA256(const String &data);
  */
 void setup()
 {
+
+	// 4
+	hdc1080.begin(0x40);
+
 	// 1
 	Serial.begin(115200);
 
@@ -89,9 +91,6 @@ void setup()
 
 	// 3
 	gpsInput.begin(GPSBaud);
-
-	// 4
-	hdc1080.begin(0x40);
 }
 
 int state = 1;
@@ -131,6 +130,7 @@ void loop()
 		{
 			temperature_list[i] = hdc1080.readTemperature();
 			humidity_list[i] = hdc1080.readHumidity();
+			Serial.printf("\tMuestra %d Temperatura %lf Humedad %lf \n", i, temperature_list[i], humidity_list[i]);
 			delay(time_between_samples);
 		}
 		state = 2;
@@ -168,6 +168,8 @@ void loop()
 			const double error = gps.hdop.hdop();
 			const double estimatedError = error * 5.0; // 5 meters is a common base error
 
+			Serial.printf("\t Muestra %d Lat %lf Lon %lf Error %lf\n", i, latitud, longitud, estimatedError);
+
 			miMapa[estimatedError] = {longitud, latitud};
 		}
 		state = 4;
@@ -195,20 +197,12 @@ void loop()
 
 		Serial.println("Iniciando BUNDLING");
 
-		// Crear payload crudo
-		String rawPayload = "{";
-		rawPayload += "\"temperature\":" + String(temperature_avg) + ",";
-		rawPayload += "\"humidity\":" + String(humidity_avg) + ",";
-		rawPayload += "\"latitude\":" + String(latitud) + ",";
-		rawPayload += "\"longitude\":" + String(longitud);
-		rawPayload += "}";
-
 		// Cifrar payload real
 		// String encryptedPayload = encryptAES128CBC(rawPayload);
 
 		// Generar hash SHA-256 sobre el payload crudo
 		// String hash = generateSHA256(rawPayload);
-		
+
 		// Obtener timestamp actual
 		time_t now = time(nullptr);
 		struct tm *timeinfo = gmtime(&now);
@@ -223,12 +217,18 @@ void loop()
 		preamble["version"] = "1.0";
 		preamble["timestamp"] = timestamp;
 
-		doc["payload"] = rawPayload;
+		// doc["payload"] = rawPayload;
 
 		JsonObject deambulo = doc.createNestedObject("deambulo");
 		deambulo["token"] = 123134311;
 
-		serializeJson(doc, output);
+		JsonDocument data;
+		data["id"] = "point01";
+		data["lat"] = latitud;
+		data["lon"] = longitud;
+		data["temperatura"] = temperature_avg;
+		data["humedad"] = humidity_avg;
+		serializeJson(data, output);
 
 		Serial.println("Paquete final:");
 		Serial.println(output);
@@ -239,13 +239,25 @@ void loop()
 	case 6:
 	{
 		Serial.println("Enviando la trama");
-		HTTPClient http;
+		WiFiClient client;
 
-		http.begin(client, route_server);
-		Serial.printf("[HTTP] begin... %s \n",route_server);
-
-		http.POST(output);
-		http.end();
+		if (client.connect(url, 80))
+		{
+			Serial.println("conectado");
+			client.println("POST /update_data HTTP/1.1");
+			client.println("Host: 10.15.69.51");
+			client.println("User-Agent: Arduino/1.0");
+			client.println("Connection: close");
+			client.println("Content-Type: application/json");
+			client.print("Content-Length: ");
+			client.println(output.length());
+			client.println();		// Línea vacía entre encabezados y cuerpo
+			client.println(output); // Envía el cuerpo
+		}
+		else
+		{
+			Serial.println("error de conexion");
+		}
 		state = 7;
 	}
 	break;
